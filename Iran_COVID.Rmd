@@ -1,0 +1,960 @@
+---
+title: "COVID-19 in Iran: a Tale of Two Years"
+output: 
+  html_document:
+    toc: TRUE
+    fig_width: 8
+    fig_height: 6
+    code_folding: "hide"
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set( 
+  echo=TRUE, 
+  warning=FALSE, 
+  message=FALSE, 
+  fig.align = 'center')
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(broom)
+library(formattable)
+library(ggtext)
+library(DT)
+
+theme_set(theme_minimal() +
+          theme(
+            axis.text = element_text(color = "grey50"),
+            axis.title = element_text(color = "grey50"),
+            plot.title = element_text(color = "grey50"),
+            plot.subtitle = element_text(color = "grey50", hjust = 0),
+            plot.caption = element_text(color = "grey50", hjust = 0)
+          ))
+```
+
+
+# Introduction
+
+## Reign of chaos
+
+
+ Everything was normal at the beginning of 2020, until a virus changed the world. An atmosphere of confusion and uncertainty dominated the mass media. In the words of Dutch prime minister Mark Rutte, "with 50% of the knowledge we have to make 100% of the decisions"^[https://blogs.lse.ac.uk/politicsandpolicy/covid-19-as-the-ultimate-leadership-challenge/]. As an example, in the image below you can see that during 2020, the fatality rate (proportion of sick people who die) of COVID-19 ranged from 1.5% to 14.5%. However, a year after the COVID-19 outbreak, the index became more stable at about 2%.
+
+![](Mortality Risk of COVID-19.png)
+
+
+## COVID in Iran: from bad to worse
+
+Coping with a catastrophic pandemic demands a huge economical and social support. But, economically, Iran is not a normal country. As one of the [most sanctioned](https://www.investopedia.com/financial-edge/0410/countries-sanctioned-by-the-u.s.---and-why.aspx) countries in the world its currency is [the second least valued](https://fxssi.com/top-10-of-the-weakest-world-currencies-in-current-year) one globally. Growth in Gross Domestic Product (GDP) per capita in Iran was almost halted after the 1979 revolution.
+
+```{r}
+# Importing GDP per capita dataset
+
+curl::curl_download("https://api.worldbank.org/v2/en/indicator/NY.GDP.PCAP.KD?downloadformat=excel", "NY_GDP_PCAP.xls")
+
+NY_GDP_PCAP <- readxl::read_excel("NY_GDP_PCAP.xls", skip = 3)
+
+names(NY_GDP_PCAP)[1] <- "region" 
+
+Iran_world_GDP <- NY_GDP_PCAP[-c(2:4)] %>% 
+  filter(region %in% c("Iran, Islamic Rep.", "World")) %>% 
+  pivot_longer(-1, names_to = "year", 
+               names_transform = list( year =as.integer), 
+               values_to = "GDP_per_capita")
+
+ggplot(Iran_world_GDP, aes(year, GDP_per_capita, col = region)) +
+  geom_path(aes(group = region), size = 2) +
+  geom_point(data = . %>% filter(year == 1979), 
+             aes(year, GDP_per_capita), size = 3, col = "red") +
+  scale_color_manual(
+    values = c("Iran, Islamic Rep." = "steelblue4", "World" = "orange" )) +
+  geom_segment(x = 1979, xend = 1979, y = 0, yend = 9000, 
+               col = "red", size = 0.5, linetype = "dashed") +
+  annotate("richtext", x = 1979, y = 9000, 
+           label = "<span style = 'color:red;'><b>1979</b></span>: The Islamic Revolution", fill = "lightblue1") +
+  labs(title = "The Tortoise and the Hare: <span style = 'color:steelblue4;'>Iran</span> and <span style = 'color:orange;'>the world's</span> GDP per capita ",
+       y = "GDP per capita (nominal, constant 2015 US$)",
+    caption = "Source: The World Bank, GDP (constant 2015 US$)") +
+  scale_y_continuous(label = scales::comma, limit = c(0, 12000)) +
+  theme(
+    plot.title = element_markdown(),
+    legend.position = "none",
+    axis.title.x = element_blank()
+  )
+```
+
+Also, we can seek signs of instability in Iran's fragile economy by studying its inflation.
+
+```{r}
+curl::curl_download("https://api.worldbank.org/v2/en/indicator/FP.CPI.TOTL.ZG?downloadformat=excel", "FP.CPI.TOTL.xls")
+
+FP.CPI.TOTL <- readxl::read_excel("FP.CPI.TOTL.xls", skip = 3)
+
+names(FP.CPI.TOTL)[1] <- "region" 
+
+Iran_world_inflation <- FP.CPI.TOTL[-c(2:4)] %>% 
+  filter(region %in% c("Iran, Islamic Rep.", "World")) %>% pivot_longer(-1, names_to = "year", names_transform = list( year = as.integer), values_to = "inflation")
+
+ggplot(Iran_world_inflation, aes(year, inflation, col = region)) +
+  geom_path(aes(group = region), size = 2) +
+  scale_color_manual(values = c("Iran, Islamic Rep." = "steelblue4", "World" = "orange" )) +
+  labs(title = " 40 years of instability: <span style = 'color:steelblue4;'>Iran's</span> inflation vs <span style = 'color:orange;'>the world</span>", 
+       y = "Inflation (annual %)",
+    caption = "Source: The World Bank, Inflation, consumer prices (annual %)") +
+  theme(
+    plot.title = element_markdown(),
+    legend.position = "none",
+    axis.title.x = element_blank()
+  )
+```
+
+After a period of thaw in Iran's economical embargo since 2013, in 2016 inflation rate plummeted to the lowest level in 30 years. However, in 2019 Iran experienced the [highest](https://www.macrotrends.net/countries/IRN/iran/inflation-rate-cpi) annual increase of inflation compared to any year after 1960 due to US withdrawal from the nuclear deal. Since the 1979 revolution, 2016-17 was the only period in which Iran experienced a one-digit inflation for two consecutive years. 
+
+High inflation rate plus negative economic growth is a phenomenon called **stagflation**, a social and economical disaster^[https://www.dw.com/en/irans-economy-plummets-under-weight-of-sanctions/a-50950471]. As usual, economical crises entail considerable social consequences. [The Bloody November](https://en.wikipedia.org/wiki/2019%E2%80%932020_Iranian_protests) in 2019 was a sign of underlying economical hardship with which people were grappling with everyday life, culminated in the bloodiest crackdown after the 1979 revolution. Iran's former president explained the situation in recent years this way: “Right now, both the economic situation and social situation are dire. Relations with neighbors, and international relations are facing serious challenges. Above all is the distrust of the public”^[https://www.wionews.com/world/exclusive-interview-with-palki-iranians-do-not-trust-decision-makers-anymore-says-ex-president-mahmoud-ahmadinejad-402665]. In short, economically and socially, Iran was anything but prepared to handle the pandemic properly.
+
+
+# Investigation
+
+
+## In search of a baseline
+
+
+ Similar to fever which is [defined](https://en.wikipedia.org/wiki/Fever) as having a temperature above the normal range, to investigate a country's performance in handling the pandemic, we need a baseline. A proper baseline should be:
+ 
+- **Easy to quantify**: Some indexes are not easy to quantify like: strictness of social distancing and distribution of face masks.
+- **Precise**: As an example, aside from estimations, you cannot precisely calculate the economical impact of the pandemic.
+- **Dimensionless**: To have a comparable parameter. For instance, obviously, a more populated country has a higher number of mortality. 
+- **Stable before the pandemic**: Just like the body temperature, to be able to compare any change with a normal range.
+- **Cumulative in nature**: To reflect the whole post-COVID period performance.
+- **Provided and updated by a credible source**
+
+## A brief history of crude death rate
+
+
+In order to find a benchmark as a feature that is stable in different countries, we can exploit [**demographic transition**](https://en.wikipedia.org/wiki/Demographic_transition). Demographic transition is a theory and phenomenon explaining the relationship between population, death rate, and birth rate in the context of human history.
+
+![](https://ourworldindata.org/uploads/2018/11/Demographic-Transition-Schematic-693x550.png)
+
+
+Since the mid-20th Century most of the world's countries progressed to stage 3 or 4 of the demographic transition^[https://populationeducation.org/stage-2-demographic-transition-model/]. As is illustrated in the informative image above, the most iconic feature of stages 3 and 4 is flattened death rate curve. In other words, **death rates are almost constant in most of the countries.**
+
+Let's delve deeper into the death rate. The crude death rate is [defined](https://en.wikipedia.org/wiki/Mortality_rate) as "the mortality rate from all causes of death for a population". We can check the death rate's stability by drawing a graph using a dataset from [The World Bank](https://data.worldbank.org/indicator/SP.DYN.CDRT.IN).
+
+```{r}
+
+
+mortality <- read_csv("https://raw.github.com/owid/covid-19-data/master/public/data/excess_mortality/excess_mortality.csv") %>% filter(date < "2022-1-1")
+
+mortality <- mortality %>% select(location, date, deaths_2020_all_ages, average_deaths_2015_2019_all_ages,
+         deaths_2021_all_ages, time, time_unit,
+          deaths_2015_all_ages, deaths_2016_all_ages, deaths_2017_all_ages, 
+         deaths_2018_all_ages, deaths_2019_all_ages)
+
+names(mortality)[c(1, 3, 5, 8:12)] <-c("country", "2020", "2021", "2015", "2016", "2017", "2018", "2019")
+
+mortality <- pivot_longer(mortality, c(3, 5, 8:12), names_to = "year", values_to = "deaths")
+
+mortality <- na.omit(mortality)
+
+countries <- unique(mortality$country)
+
+#Importing the death rate dataset
+
+death_rate_historical <- read_csv("API_SP.DYN.CDRT.IN_DS2_en_csv_v2_3471529.csv")[-c(3, 4, 65)]
+
+names(death_rate_historical)[1] <- "country"
+
+death_rate_historical <- death_rate_historical %>% 
+  mutate(country = recode(country, "Iran, Islamic Rep." = "Iran")) %>% 
+  filter(country %in% c(countries, "World")) %>% na.omit() %>% 
+  pivot_longer(-c(1,2), names_to = "year", 
+               names_transform = list(year = as.integer), values_to = "deaths_per_thousand")
+
+#Importing the world population dataset to calculate mean population of 2015-19
+
+world_pop_hist <- read_csv("API_SP.POP.TOTL_DS2_en_csv_v2_2763937.csv")
+names(world_pop_hist)[c(1, 65)] <- c("country", "pop_2020")
+
+world_pop <- world_pop_hist[c(1, 60:64)] %>% 
+  pivot_longer(-1, names_to = "year", values_to = "population") %>%
+  group_by(country) %>% 
+  summarise(avg_pop_15_19 = mean(population, na.rm = TRUE)) %>%
+  left_join(world_pop_hist[c(1,65)]) %>%
+  add_row(country = "Taiwan", avg_pop_15_19 = 23670112, pop_2020 = 23816775) #(www.worldometers.info)
+  
+world_pop$country[world_pop$country %in%
+                    c("Czech Republic", "Egypt, Arab Rep.", "Faroe Islands", 
+                      "Hong Kong SAR, China", "Iran, Islamic Rep.", "Kyrgyz Republic", "Macao SAR, China", "Russian Federation", "Slovak Republic", "Korea, Rep.")] <- c("Czechia", "Egypt", "Faeroe Islands", "Hong Kong", "Iran", "South Korea", "Kyrgyzstan", "Macao", "Russia", "Slovakia")
+
+left_join(death_rate_historical, world_pop, by = "country") %>%
+  filter(avg_pop_15_19 > 1000000) %>%
+  ggplot() +
+  geom_path(aes(year, deaths_per_thousand / 1000, group = country), col = "grey", alpha = 0.3) +
+  geom_path(data = . %>% 
+              filter(country %in% c("Iran", "World")), 
+            aes(year, deaths_per_thousand / 1000, group = country, col = country),
+             size = 2) + 
+  scale_color_manual(values = c("Iran" = "steelblue4",
+                            "World" = "orange")) +
+  ylim(c(0, 0.026)) +
+  labs(x = "Year", y = "Death Rate", 
+       title = "Death rates were stable in recent two decades: <span style = 'color:steelblue4;'>Iran</span> vs <span style = 'color:orange;'>the world</span>",
+       subtitle = "Other countries are rendered as thin transparent grey lines",
+       caption = "Countries are restricted to which present in the excess death dataset with population more than a million.\nSource: The World Bank,Death rate, crude ") +
+  theme(
+    plot.title = element_markdown(),
+      axis.title.x = element_blank(),
+    legend.position = "none"
+  )
+```
+
+Visually, similar to the world, Iran's death rate is more stable in recent years. But, it is harder to compare Iran to other countries confidently.
+
+
+```{r}
+death_rate_change <- death_rate_historical %>% group_by(country) %>% summarise(death_rate = deaths_per_thousand / 1000, year, lag = lag(death_rate), change_percent = ((death_rate - lag) / death_rate) * 100)
+
+left_join(death_rate_change, world_pop, by = "country") %>% filter(avg_pop_15_19 > 1000000) %>%
+ggplot() +
+  geom_path(aes(year, change_percent, group = country), col = "grey", alpha = 0.2) +
+  geom_path(data = . %>% filter(country %in% c("Iran", "World")),
+            aes(year, change_percent, col = country), size = 2) +
+  geom_point(data = . %>% filter(country %in% c("Iran", "World") & year == 1997),aes(year, change_percent), col = "red", size = 3, shape = 18) +
+  geom_segment(x = 1997, xend = 1997, y = -20, yend = -1) +
+  annotate(geom = "richtext", x = 1997, y = -20, fill = "lightblue1",
+           label = "Since <b><span style = 'color:darkred;'>1997</span></b> <span style = 'color:steelblue4;'>Iran</span> and<br><span style = color:orange;'>the world's</span> death rate growth<br>are almost the same") +
+  scale_color_manual(values = c("Iran" = "steelblue4", "World" = "Orange")) +
+  labs(y = "Annual change in death rate %",
+       title = "20+ years of similar death rate growth: <span style = 'color:steelblue4;'>Iran</span> vs <span style = 'color:orange;'>the world</span>",
+       subtitle = "Other countries are rendered as thin transparent grey lines",
+       caption = "Countries are restricted to which present in the excess death dataset with population more than a million.\nSource: The World Bank,Death rate, crude ") +
+  theme(
+    plot.title = element_markdown(),
+    legend.position = "none",
+    axis.title.x = element_blank()
+  )
+```
+
+The preceding graph suggests two important insights: 
+
+1. After 1997, the world and Iran's yearly death rate growth are **almost similar.**
+2. Both Iran and the world's **annual death rate are converging to 0**, so, another evidence in favor of a **stable crude death rate.**
+
+It is also worth noting that after 2000, most other countries' year over year crude death rate change is fluctuating within 5%.
+
+To wrap it up, in **a normal situation**, we anticipate a **negligible change in annual crude death rate** of a country Unless a large-scale disaster similar to COVID-19 destroys the balance. Therefore, it is possible to employ change in crude death rate to measure the impact of COVID-19 in different countries and consequently, comparing nations' performance in handling COVID.
+
+
+## Crude death rate after the pandemic
+
+### Deaths pattern in Iran from 2015 to 2021
+
+So far, we know that, in recent decades yearly crude death rate for a given country is almost constant. Unfortunately, I could not find a robust dataset which contains crude death rate of 2020 and 2021 directly. Yet, [Our World in Data](https://github.com/owid/covid-19-data) provides some valuable datasets which are main sources of data for this notebook. Especially, [a certain dataset](https://github.com/owid/covid-19-data/tree/master/public/data/excess_mortality) about excess mortality is helpful in this section. 
+
+Let's focus on Iran and study the weekly deaths pattern from 2015 to 2021.
+
+```{r}
+excess <- mortality %>% filter(year %in% c(2020, 2021)) %>% 
+  mutate(time = case_when(
+    year != 2020 & time_unit == "weekly" ~ time + 53,
+    year != 2020 & time_unit == "monthly" ~ time + 12,
+    TRUE ~ time),
+    date = case_when(
+  year == 2021 & time_unit == "weekly" ~ as_date("2020-01-05") + weeks(time - 1),
+  year == 2021 & time_unit == "monthly" ~ rollforward(as_date("2020_01_31") - weeks(1) + months(time - 1)),
+  TRUE ~ date
+), excess_deaths = deaths - average_deaths_2015_2019_all_ages) 
+
+Ir_20_21 <- mortality %>% filter(year %in% c(2020, 2021), country == "Iran")
+
+Ir_15_19 <- mortality %>% filter(year %in% c(2015:2019), country == "Iran")
+
+ggplot() +
+  geom_path(data = Ir_20_21, aes(time, deaths, col = year), size = 2 ) +
+  geom_path(data = Ir_15_19, aes(time, deaths, group = year), col = "gray80") +
+  scale_color_manual(values = c("2020" = "dodgerblue2", "2021" = "firebrick2")) +
+  labs(x = "Time (weeks of year)", y = "Weekly deaths", 
+       title = "Iran's deaths pattern changed enormously in <span style = 'color:dodgerblue2;'>2020</span> and <span style = 'color:firebrick2;'>2021</span> compared to <span style = 'color:grey80;'>2015-19</span>",
+       caption = "Source: Our World in Data") +
+  scale_y_continuous(labels = scales::comma, limits = c(0, 20000)) +
+  xlim(0, 52) +
+  theme(
+    plot.title = element_markdown(),
+      legend.position = "none"
+  )
+```
+
+
+Clearly, by the emergence of COVID-19 during 2020 and 2021, the balance in deaths trend of previous years was destroyed. However, is this surge in weekly deaths in 2020-21 statistically significant? 
+
+### Increase in death rates: a statistical prespective
+
+Normally, [Welch’s t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test) is one way to determine whether the mean of two vectors are statistically different^[https://peopleanalytics-regression-book.org/found-stats.html?q=t.tes#means-sig] (or generally, [Student's t-test](https://en.wikipedia.org/wiki/Student%27s_t-test) if the sample sizes and variance of the two vectors are equal which is not the case here). Comparing each year with the `average_deaths_2015_2019_all_ages` in our dataset is possible using the `t.test` function in R language. Actually, we are testing two dependent samples, so we should make sure the `paired` option is `TRUE`:
+
+```{r}
+#A custom color_tile for formattable that its output color is associated to the absolute quantity of inputs
+
+custom_tile1 <-  function(col){formatter("span",
+                 style = x ~ style(display = "block", 
+                                padding = "0 4px", 
+                                `border-radius` = "4px", 
+                                `background-color` = csscolor(gradient(as.numeric(abs(x)), "transparent", col))))}
+
+#A custom color_tile for formattable that its output color is associated to the logarithmic rescaling of inputs
+
+custom_tile2 <- function(col){ formatter("span",
+                 style = x ~ style(display = "block", 
+                                padding = "0 4px", 
+                                `border-radius` = "4px", 
+                                `background-color` = csscolor(gradient(-as.numeric(log(x)), "transparent", col))))}
+
+mortality %>% filter(year %in% c(2015:2021), country == "Iran") %>% group_by(year) %>% do(tidy(t.test(.$deaths, .$average_deaths_2015_2019_all_ages, paired = TRUE))) %>% 
+  summarise(year, across(c(estimate, conf.low, conf.high), round), statistic = round(statistic, 1), p.value = signif(p.value, 2)) %>% arrange(desc(year)) %>%
+  select(year, conf.low, conf.high, statistic, p.value) %>%
+  formattable(align =rep("c", ncol(.)), list(
+  `Indicator Name` = formatter("span", style = ~ style(color = "grey",font.weight = "bold")),
+  `p.value` = custom_tile2("green3"),
+  `statistic` = custom_tile1("deepskyblue")
+)) %>% as.datatable(options = list(dom = "t",
+                                   columnDefs = 
+                           list(list(className = 'dt-center', 
+                                     targets = "_all"))), 
+                    caption = htmltools::tags$caption(
+    style = 'caption-side: bottom; text-align: left;',
+    'Note: Darker color for p.value shows smaller p.value.')
+  ) 
+```
+
+The output of a t-test is not a simple yes or no answer, but a probabilistic one based on a [t-distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution). However, to put it roughly together, whenever the `p.value` is less than 0.05, or 0 is not included in the confidence interval, or (roughly in this case) statistic is more than 2; we can conclude that the difference between means of the two vectors is statistically significant. Unsurprisingly, 2020 and 2021 weekly deaths averages are significantly different from the average for 2015-19. **But**, there is also a difference (also far less significant) between all other years except 2016, and the average for 2015-19.
+
+We can count three main issues which make a conventional t-test faulty in our current analysis:
+
+- **In a t-test samples should be normally distributed**
+
+- **The [effect size](https://en.wikipedia.org/wiki/Effect_size) (the magnitude of difference between the two means) is not explicitly evident as a result of a t-test**
+
+- **The sample size is not sufficient to detect small effect sizes**
+
+[G*Power](https://www.psychologie.hhu.de/arbeitsgruppen/allgemeine-psychologie-und-arbeitspsychologie/gpower) is a free software to calculate the [statistical power](https://en.wikipedia.org/wiki/Power_of_a_test) of a study. By putting [type I and II errors](https://en.wikipedia.org/wiki/Type_I_and_type_II_errors) equal to 0.05, to detect a [medium effect size](https://en.wikipedia.org/wiki/Effect_size) of 0.5, we need a sample size of 54.
+
+![](https://i.imgur.com/fmzWGyx.png)
+
+However, we have access to weekly deaths numbers and there are 52 weeks in a year. Furthermore, all the previous assumptions are valid if the sample is **normally-distributed**. Let's check the distribution of weekly deaths in 2015-2021:
+
+
+```{r}
+ggplot() +
+  geom_histogram(data = Ir_15_19, aes(deaths), fill = "grey50") +
+  geom_histogram(data = Ir_20_21, aes(deaths), fill = "darkblue") +
+  facet_wrap(~year) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "The skewness in weekly deaths numbers' distribution in 
+       <span style = 'color:darkblue;'>2020-21</span> compared to 
+       <span style = 'color:grey50;'>2015-19</span>",
+       x = "Weekly deaths number", y = "Count") +
+  theme(
+    plot.title = element_markdown()
+  )
+```
+
+In the above histograms, we can see the skewness of weekly deaths numbers distribution in 2020 and 2021.
+
+Concretely, a conventional t-test is not very informative in our current analysis. Instead, **the sequential probability ratio test** or **SPRT** is exactly what we need^[https://martinschnuerch.com/wp-content/uploads/2020/08/Schnuerch_Erdfelder_2020.pdf]:
+
+- **It does not need a fixed sample size and manages to continue the test until reaching a conclusion.**
+
+- **It performs way better in non-normal samples**
+
+- **We can define the required power, significance level, and effect size in advance**
+
+The `sprtt` [package](https://cran.r-project.org/web/packages/sprtt/index.html) is designed to perform SPRT t-tests in R. Unfortunately, at the time of writing this notebook `sprtt` package is not available in the Kaggle environment. Instead, a script provided by [Schnuerch and Erdfelder](https://osf.io/wz8da/) is being used. This script is part of their enlightening [paper](https://martinschnuerch.com/wp-content/uploads/2020/08/Schnuerch_Erdfelder_2020.pdf) about SPRT which is highly recommended to gain insight into this statistical approach. To detect large effect sizes, we can put a large [Cohen's d](https://www.statisticshowto.com/cohens-d/) `d = 0.8`. Since the samples are dependent, `paired = TRUE` should be checked.
+
+
+```{r}
+# Code for sprt.t.test function from https://osf.io/wz8da/
+
+# HELP FUNCTIONS ----------------------------------------------------------
+
+#----------------------
+.sprt.lr <- function(x, y, mu, d, type, alt){
+  ttest <- switch(type,
+                  one.sample = t.test(x, mu = mu),
+                  two.sample = t.test(x, y, mu = mu,
+                                      var.equal = T),
+                  paired = t.test(x, y, mu = mu,
+                                  paired = T))
+  ncp <- ifelse(type == "two.sample", 
+                d/sqrt(1/length(x) + 1/length(y)), 
+                d * sqrt(length(x)))
+  tval <- ifelse(alt == "less", 
+                 -1 * as.vector(ttest$statistic), 
+                 as.vector(ttest$statistic))
+  dof <- as.vector(ttest$parameter)
+  if(alt=="two.sided"){
+    df(tval^2, df1 = 1, df2 = dof, ncp = ncp^2)/df(tval^2, df1 = 1, df2 = dof)
+  } else{
+    dt(tval, dof, ncp = ncp)/dt(tval, dof)
+  }
+}
+
+#----------------------
+.sprt.formula <- function(formula, data = NULL, 
+                          mu = 0, d, alpha = 0.05, power = 0.95, 
+                          alternative = "two.sided", paired = FALSE){
+  
+  ##### CHECK INPUT
+  match.arg(alternative, c("two.sided", "less", "greater"))
+  if(!(alpha > 0 && alpha < 1)) 
+    stop("Invalid argument <alpha>: Probabilities must be in ]0;1[.")
+  if(!(power > 0 && power < 1)) 
+    stop("Invalid argument <power>: Probabilities must be in ]0;1[.")
+  if(d <= 0) 
+    stop("Invalid argument <d>: Must be greater than 0.")
+  if(!is.numeric(mu)) 
+    stop("Invalid argument <mu>: Must be numeric.")
+  if(!is.logical(paired)) 
+    stop("Invalid argument <paired>: Must be logical.")
+  
+  if ((length(formula) != 3L) || (length(formula[[3]]) != 1L)) 
+    stop("'formula' is incorrect. Please specify as 'x~y'.")
+  temp <- model.frame(formula, data) 
+  x <- temp[,1]
+  y <- temp[,2]
+  
+  whichNA <- is.na(x) | is.na(y)
+  x <- x[!whichNA]
+  y <- y[!whichNA]
+  
+  if(!is.numeric(x)) 
+    stop(paste("Dependent variable",  names(temp)[1], "must be numeric."))
+  if(length(unique(y))!=2) 
+    stop(paste("Grouping factor", names(temp)[2], "must contain exactly two levels."))
+  if(paired){
+    if(!(table(y)[[1]]==table(y)[[2]]))
+      stop("Unequal number of observations per group. Independent samples?")
+  }else{
+    if(length(x)<3) 
+      stop("SPRT for two independent samples requires at least 3 observations.")
+  }
+  
+  sd.check <- tapply(x, INDEX=y, FUN=sd)
+  sd.check <- ifelse(is.na(sd.check), 0, sd.check)
+  if(max(sd.check) == 0) 
+    stop("Can't perform SPRT on constant data.")
+  
+  ##### RETURN ARGUMENTS
+  y <- as.factor(y)
+  x.1 <- x[y == levels(y)[1]]
+  x.2 <- x[y == levels(y)[2]]
+  data.name <- paste(names(temp)[1], "by", names(temp)[2])
+  method <- ifelse(paired, "Paired SPRT t-test", "Two-Sample SPRT t-test")
+  null.value <- mu
+  attr(null.value, "names") <- "difference in means"
+  if(paired){
+    estimate <- mean(x.1 - x.2)
+    attr(estimate, "names") <- "mean of the differences"
+  }else{
+    estimate <- c(mean(x.1), mean(x.2))
+    attr(estimate, "names") <- c("mean in group 1", "mean in group 2")
+  }  
+  arg.list <- list(x = x.1, y = x.2,
+                   mu = mu, d = d, alpha = alpha, power = power, 
+                   type = ifelse(paired, "paired", "two.sample"), 
+                   alt = alternative)
+  printarg.list <- list(estimate = estimate,
+                        null.value = null.value,
+                        alternative = alternative,
+                        effect.size = d,
+                        method = method,
+                        data.name = data.name)
+  
+  result <- do.call(.sprt.result, arg.list)
+  output <- c(result, printarg.list)
+  class(output) <- "sprt"
+  return(output)
+}
+
+#----------------------
+.sprt.default <- function(x, y = NULL, 
+                          mu = 0, d, alpha = 0.05, power = 0.95, 
+                          alternative = "two.sided", paired = FALSE){
+  
+  ##### CHECK INPUT
+  match.arg(alternative, c("two.sided", "less", "greater"))
+  if(!(alpha > 0 && alpha < 1)) 
+    stop("Invalid argument <alpha>: Probabilities must be in ]0;1[.")
+  if(!(power > 0 && power < 1)) 
+    stop("Invalid argument <power>: Probabilities must be in ]0;1[.")
+  if(d<=0) 
+    stop("Invalid argument <d>: Must be greater than 0.")
+  if(!is.numeric(mu)) 
+    stop("Invalid argument <mu>: Must be numeric.")
+  
+  if(!is.null(y)){
+    x.name <- deparse(substitute(x))
+    y.name <- deparse(substitute(y))
+    data.name <- paste(x.name, "and", y.name)
+    
+    if(!(is.atomic(x) && is.null(dim(x)))) 
+      warning(paste(x.name, "is not a vector. This might have caused problems."), call. = F)
+    if(!(is.atomic(y) && is.null(dim(y)))) 
+      warning(paste(y.name, "is not a vector. This might have caused problems."), call. = F)
+    if(is.factor(y)) 
+      stop("Is y a grouping factor? Use formula interface x ~ y.")
+    if(!is.numeric(x)) 
+      stop(paste("Invalid argument:",  x.name, "must be numeric."))
+    if(!is.numeric(y)) 
+      stop(paste("Invalid argument:",  y.name, "must be numeric."))
+    if(!paired && (length(x) + length(y) < 3)) 
+      stop("SPRT for two independent samples requires at least 3 observations.")
+    
+    sd.check <- c(sd(x), sd(y))
+    sd.check <- ifelse(is.na(sd.check), 0, sd.check)
+    if(!(max(sd.check) > 0)) 
+      stop("Can't perform SPRT on constant data.")
+    if(!is.logical(paired)) 
+      stop("Invalid argument <paired>: Must be logical.")
+    
+    type <- ifelse(paired, "paired", "two.sample")
+    method <- ifelse(paired, "Paired SPRT t-test", "Two-Sample SPRT t-test")
+    null.value <- mu
+    attr(null.value, "names") <- "difference in means"
+    if(paired){
+      if(length(x) != length(y)) 
+        stop("Unequal number of observations per group. Independent samples?")
+      whichNA <- is.na(x) | is.na(y)
+      x <- x[!whichNA]
+      y <- y[!whichNA]
+      estimate <- mean(x - y)
+      attr(estimate, "names") <- "mean of the differences"
+    }else{
+      x <- x[!is.na(x)]
+      y <- y[!is.na(y)]
+      estimate <- c(mean(x), mean(y))
+      attr(estimate, "names") <- c(paste("mean of", x.name), paste("mean of", y.name))
+    }
+  }else{
+    data.name <- deparse(substitute(x))
+    
+    x <- x[!is.na(x)]
+    if(!is.numeric(x)) 
+      stop(paste("Invalid argument:",  data.name, "must be numeric."))
+    sd.check <- ifelse(is.na(sd(x)), 0, sd(x))
+    if(!(sd.check > 0)) 
+      stop("Can't perform SPRT on constant data.")
+    
+    type <- "one.sample"
+    method <- "One-Sample SPRT t-test"
+    null.value <- mu
+    attr(null.value, "names") <- "mean"
+    estimate <- mean(x)
+    attr(estimate, "names") <- "mean of x"
+  }
+  
+  ##### RETURN ARGUMENTS
+  
+  arg.list <- list(x = x, y = y,
+                   mu = mu, d = d, alpha = alpha, power = power, 
+                   type = type, 
+                   alt = alternative)
+  printarg.list <- list(estimate = estimate,
+                        null.value = null.value,
+                        alternative = alternative,
+                        effect.size = d,
+                        method = method,
+                        data.name = data.name)
+  result <- do.call(.sprt.result, arg.list)
+  output <- c(result, printarg.list)
+  class(output) <- "sprt"
+  return(output)
+}
+
+#----------------------
+.sprt.result <- function(x, y, mu, d, alpha, power, type, alt){
+  A <- power/alpha
+  B <- (1 - power)/(1 - alpha)
+  lr <- .sprt.lr(x, y, mu, d, type, alt)
+  if(lr >= A){
+    decision <- "accept H1"
+  }else if(lr <= B){
+    decision <- "accept H0"
+  }else{
+    decision <- "continue sampling"
+  }
+  attr(lr, "names") <- "likelihood ratio"
+  parameters <- c(alpha, power)
+  attr(parameters, "names") <- c("Type I error", "Power")
+  thresholds <- c(B, A)
+  attr(thresholds, "names") <- c("lower", "upper")
+  return(list(statistic = lr, 
+              decision = decision, 
+              parameters = parameters, 
+              thresholds = thresholds))
+}
+
+#----------------------
+print.sprt <- function(x){
+  cat("    ", x$method, "\n")
+  cat("\ndata:", x$data.name, "\n")
+  cat(names(x$statistic), " = ", round(x$statistic, digits = 5), ", decision = ", x$decision, sep="")
+  cat("\nSPRT thresholds:\n")
+  print(round(x$thresholds, digits = 5))
+  cat("alternative hypothesis: true", names(x$null.value), "is",
+      ifelse(x$alternative=="two.sided", "not equal to", paste(x$alternative, "than")), x$null.value)
+  cat("\neffect size: Cohen's d =", x$effect.size, "\n")
+  print(x$parameters)
+  cat("sample estimates:\n")
+  print(round(x$estimate, digits = 5))
+}
+
+# MAIN FUNCTION -----------------------------------------------------------
+
+sprt.t.test <- function(...) UseMethod(".sprt")
+
+# A function to make a data frame out of the results of the sprt.t.test function
+s3_fun <- function(obj){
+  decision = obj$decision
+  ratio = obj$statistic
+  mean_differences = obj$estimate
+  result = data.frame(decision = decision, 
+                      likelihood_ratio_log = round(log(ratio), 2),
+                      mean_differences = round(mean_differences, 1)
+  )
+  return(result)
+}
+
+mortality %>%
+  filter(year %in% c(2015:2021), country == "Iran") %>%
+  group_by(year) %>%
+  do(s3_fun(sprt.t.test(.$deaths, .$average_deaths_2015_2019_all_ages, 
+                        d = 0.8, power = 0.95, paired = TRUE))) %>%
+  arrange(desc(year)) %>%
+    formattable(align =rep("c", ncol(.)), list(
+      `Indicator Name` = formatter("span", style = ~ style(color = "grey",font.weight = "bold")),
+      `likelihood_ratio_log` = color_tile("transparent", "deepskyblue"),
+      `mean_differences` = custom_tile1("green3")
+      )) %>% 
+      as.datatable(options = list(dom = "t",
+                                     columnDefs = 
+                                       list(list(className = 'dt-center', 
+                                                 targets = "_all"))), 
+                      caption = htmltools::tags$caption(
+                        style = 'caption-side: bottom; text-align: left;',
+                        'Note: The thresholds for likelihood_ratio_log are -2.94 and +2.94.')
+  )
+
+```
+
+The likelihood ratio is defined as:
+$$\text{likelihood_ratio_log} =\log\left(\frac{p(data |H1_\text{ (alternative hypothesis)})}{p(data |H0_\text{ (null hypothesis)})}\right)$$ 
+or
+
+$$ = \log\left(\frac{\text{probability of obtaining the result given that the two means are}\textbf{ diffrent}}{\text{probability of obtaining the result given that the two means are}\textbf{ not diffrent}}\right)$$
+
+Similar to a conventional t-test, when the `likelihood_ratio_log` is larger than an upper threshold (hear +2.94), it roughly means that we can reject the null hypothesis and infer that there is a significant difference between the means of two samples. On the other hand, when the `likelihood_ratio_log` is smaller than a lower threshold (hear -2.94), we should stick with the null hypothesis and confirm that there is not a significant difference regarding the predetermined [alpha, beta](https://www.statisticshowto.com/beta-level/), and Cohen's d.
+
+As expected, the means of 2020 and 2021 are significantly different from the 2015-19 average, but again similar to the Welch's t-test we performed previously, 2019 is also different.
+
+### 2019 a bloody precursor of the COVID era
+ 
+ Regarding 2019, there are claims about [unreported cases of COVID-19 infections](https://www.newyorker.com/magazine/2020/05/25/the-twilight-of-the-iranian-revolution). But as we will see later, the increasing wave of mortality began in November. Therefore, COVID is an improbable factor. There is another culprit for surge in mortality of 2019. [**The Bloody November**](https://en.wikipedia.org/wiki/2019%E2%80%932020_Iranian_protests) protest,  which was suppressed by an iron fist of Iranian military and paramilitary forces, resulted to [1500 protesters]([https://www.reuters.com/article/us-iran-protests-specialreport/special-report-irans-leader-ordered-crackdown-on-unrest-do-whatever-it-takes-to-end-it-idUSKBN1YR0QR) being killed (of course the officially announced numbers are less than that). In addition, there was a report of 20% yearly [increase of flu during fall 2019](https://kavehmadani.medium.com/in-search-of-the-murder-making-sense-of-irans-reported-deaths-4279d2b03175).
+ 
+ 
+```{r}
+Ir_15_19$year <- as.numeric(as.character(Ir_15_19$year))
+
+year(Ir_15_19$date) <- Ir_15_19$year
+
+Ir_15_19 <- Ir_15_19 %>% mutate(Day = as.numeric(date - floor_date(date, "years")))
+
+ggplot(data = Ir_15_19 %>% filter(year == 2019)) +
+  geom_path(data = Ir_15_19 %>% filter(year != 2019), aes(Day, deaths, group = year), col = "grey90", alpha = 0.7) +
+  geom_path(data = Ir_15_19 %>% filter(year == 2019 & Day <= 318), aes(Day, deaths), col = "grey60", size = 2) +
+  geom_path(data = Ir_15_19 %>% filter(year == 2019 & Day <= 318), aes(Day, average_deaths_2015_2019_all_ages), col = "grey70", size = 2) +
+  geom_path(data = Ir_15_19 %>% filter(year == 2019 & Day >= 318), aes(Day, average_deaths_2015_2019_all_ages), col = "turquoise4", size = 2) +
+  geom_point(data = Ir_15_19 %>% filter(year == 2019 & Day >= 318), aes(Day, average_deaths_2015_2019_all_ages), col = "turquoise4", size = 3, shape = 18) +
+  geom_path(data = Ir_15_19 %>% filter(year == 2019 & Day >= 318), aes(Day, deaths), col = "orange", size = 2) +
+  geom_point(data = Ir_15_19 %>% filter(year == 2019 & Day >= 318), aes(Day, deaths), col = "orange", size = 3, shape = 18) +
+  geom_segment(aes(x = 318, xend = 318, y = 0, yend = 2600), col = "red", size = 0.5, linetype = "dashed") +
+  geom_segment(aes(x = 318, xend = 318, y = 4500, yend = 9500 ), col = "red", size = 0.5, linetype = "dashed") +
+  scale_y_continuous(label = scales::comma) +
+  annotate(geom = "text", x = 318, y = 9700, label ="Protests start", col = "red", size = 3, fontface = 2) +
+  labs(x = "Day of year", y = "Weekly total deaths", 
+       title = "Total deaths in Iran: 
+       <span style = 'color:orange;'>2019</span> vs 
+       <span style = 'color:turquoise4;'>average for 2015-19</span> and 
+       <span style = 'color:darkblue;'>the difference between them</span>",
+       subtitle = "<span style = 'font-size:10pt; color:grey50'>2015-2018 are shown as thin transparent lines</span>") +
+  geom_bar(data = Ir_15_19 %>% filter(year == 2019 & Day <= 317), aes(Day, deaths - average_deaths_2015_2019_all_ages), stat = "identity", fill = "grey50") +
+  geom_bar(data = Ir_15_19 %>% filter(year == 2019 & Day > 317), aes(Day, deaths - average_deaths_2015_2019_all_ages), stat = "identity", fill = "darkblue") +
+  scale_x_continuous(n.breaks = 8) +
+  annotate(geom = "richtext", x = 285, y = 3500, hjust = 0, color = "firebrick3", size = 3.5, fontface = 2, fill = "lavender",
+          label = "The maximum<br>difference occurs<br>two weeks after<br>the start of protests") +
+  annotate(geom = "richtext", x = -10, y = 0, size = 3.5,
+           label = "The growth of<br>deaths in 2019",
+           angle = 90) +
+  theme_classic() +
+  theme(
+    axis.line = element_line(color = "grey"),
+    axis.title.y = element_text(color = "grey40", hjust = 1),
+    axis.title.x = element_text(color = "grey40", hjust = 0),
+    plot.title = element_markdown(),
+    plot.subtitle = element_markdown()
+  ) +
+  geom_text(data = Ir_15_19 %>% filter(year == 2019 & Day %in% 317:350),
+            size = 3, angle = 90, hjust = 1, color = "white",
+            aes(x = Day, y = deaths - average_deaths_2015_2019_all_ages,
+                label = round(deaths - average_deaths_2015_2019_all_ages)))
+```
+
+### A huge surge after COVID outbreak
+
+Before digging deeper, remember that normally, we anticipate **steady death rates** for 2015-21. We have deaths and population data of `r length(unique(mortality$country))` nations after COVID outbreak, so, we can calculate the **crude death rate** change of post-COVID (2020-21) period in comparison to pre-COVID period (2015-19) for each country. The population for post-COVID and pre-COVID years are extracted from [The World Bank dataset](https://data.worldbank.org/indicator/SP.POP.TOTL) enteries for 2020 and the average of 2015 to 2019 respectively. Also, `med_age` (median age in 2020) is included to make the comparison more fairly.
+
+```{r}
+
+med_age_2020 <- read_csv("population_by_country_2020.csv")[c(1, 9)]
+
+names(med_age_2020) <- c("country", "med_age")
+
+med_age_2020$country[med_age_2020$country == "Czech Republic (Czechia)"] <- "Czechia"
+
+med_age_2020$med_age <- as.numeric(med_age_2020$med_age) 
+
+rate <- excess %>% group_by(country) %>% summarise(date = max(date), deaths_20_21 = sum(deaths), deaths_15_19_avg = sum(average_deaths_2015_2019_all_ages))
+
+
+death_rate <- left_join(rate, world_pop) %>% left_join(med_age_2020[c(1,2)]) %>% mutate(death_rate_15_19 = round(deaths_15_19_avg / avg_pop_15_19, 6),
+         death_rate_20_21 = round(deaths_20_21 / pop_2020, 6), 
+         `change%` = round(((death_rate_20_21 - death_rate_15_19) / death_rate_15_19) * 100, 1)) %>% filter(!is.na(`change%`)) %>% arrange(desc(`change%`))
+
+names(death_rate)[2] <- c("last_date")
+
+death_rate %>% select(-c(deaths_20_21, deaths_15_19_avg, avg_pop_15_19, pop_2020)) %>% formattable( align = rep("c", ncol(death_rate)), list(
+  `Indicator Name` = formatter("span", style = ~ style(color = "grey",font.weight = "bold")),
+  `country` = formatter("span", style = ~ style (display = "block",
+                                                 `background-color` = ifelse(country== "Iran", "lavender", NA))),
+  `death_rate_15_19` = color_tile("transparent", "darkgoldenrod1"),
+  `death_rate_20_21` = color_tile("transparent", "chocolate1"),
+  `change%` = color_tile("mistyrose", "orangered")
+)) %>% as.datatable(options = list(pageLength = 15, autoWidth = TRUE, scrollX = FALSE,
+  columnDefs = list(list(className = "dt-center", targets = "_all"))
+)) %>% formatStyle("country", 
+                       backgroundColor = styleEqual("Iran", "blue"))
+```
+
+The crude death rate of Iran, a country with an almost **constant** death rate for more than 20 years, **increased** by about 35% during the pandemic. Among `r nrow(death_rate)` nations with available data, Iran is **`r which(death_rate$country == "Iran")`th** worst hit country.
+
+At the end of the table above, you can find countries which their death rate decreased during the pandemic. Some possible explaining factors are: overcounting the COVID-caused mortality (as is the case in [Belgium](https://www.dw.com/en/belgiums-coronavirus-overcounting-controversy/a-53660975)), false positive test results, and finally [decrease in deaths due to non-COVID causes](https://www.health.org.uk/publications/long-reads/what-has-happened-to-non-covid-mortality-during-the-pandemic). 
+
+## COVID-caused and excess deaths
+
+There are many instances of comparison between nations based on their **confirmed COVID mortality**. Is this comparison fair? Let's [define](https://www.health.org.uk/publications/long-reads/what-has-happened-to-non-covid-mortality-during-the-pandemic) excess deaths for 2020-21 as the number of deaths above the average when compared to the corresponding period in the non-pandemic period of 2015-19. Ideally, we can expect COVID-caused deaths to be equal to excess deaths during the pandemic.
+
+```{r}
+options(scipen = 6)
+
+covid_deaths <- read_csv("https://raw.github.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv") %>% pivot_longer(-c(1:4), names_to = "date", values_to = "deaths") %>% mutate(date = mdy(date)) %>% filter(date < as_date("2022-1-1"))
+
+names(covid_deaths)[c(1, 2)] <- c("state", "country")
+
+Ir_covid_deaths <- covid_deaths %>% filter(country == "Iran") %>% mutate(week = week(date), year = year(date))  %>% group_by(year, week) %>% summarise(deaths_weekly = max(deaths)) %>%
+  mutate(week_total = ifelse(year != 2020, week + 53, week))
+
+ggplot() +
+  geom_path(data = Ir_covid_deaths, aes(week_total, deaths_weekly), col = "dodgerblue", size = 2) +
+  geom_path(data = excess %>% filter(country == "Iran") %>% arrange(time), aes(time, cumsum(excess_deaths)), col = "dodgerblue4", size = 2) +
+  scale_y_continuous(n.breaks = 6, label = scales::comma) +
+  annotate(geom = "text", x = c(100,100) , y = c(270000, 110000), label = c("excess deaths", "COVID mortality"), color = c("dodgerblue4","dodgerblue")) +
+  labs(x = "Weeks after the start of 2020",
+       y = "Cumulative deaths",
+       title = "Iran 2020-21: total excess deaths vs COVID mortality",
+       caption = "Sources: Our World in Data and Johns Hopkins University")
+```
+
+
+Judging from the graph above, after the start of 2020 the difference between excess and confirmed COVID-caused deaths is significant, i.e., at the end of 2021 the actual excess deaths from the start of the pandemic is more than two times of the reported deaths caused by COVID-19. 
+
+Excess mortality during COVID pandemic can be modeled as sum of several distinct factors^[https://elifesciences.org/articles/69336]:
+
+**Excess mortality** = sum of:
+
++ **(A)** Deaths directly caused by COVID infection 
+
++ **(B)** Deaths caused by medical system collapse due to COVID pandemic 
+
++ **(C)** Excess deaths from other natural causes (other diseases) 
+
++ **(D)** Excess deaths from unnatural causes (traffic accidents, drug overdoses, etc.)
+
++ **(E)** Excess deaths from extreme events (wars, natural disasters, etc.)
+
+ As discussed by [researchers](https://elifesciences.org/articles/69336), for **most** countries, the contribution of factors B, C, and E to excess mortality is small in comparison to factor A. Therefore, ideally, **the excess deaths and COVID mortality should be nearly the same**. But, considering the image above, **it is far from being the case for Iran**. 
+ 
+ In conclusion, there are several possible scenarios for Iran and similar countries' discrepancy between excess death and COVID mortality:
+
+1- Underreporting of COVID mortality is due to lack of test kits and facilities.
+
+2- The definition of mortality due to COVID-19 is [strict](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7488823/) and does not cover all of the COVID-caused deaths.
+
+3- Some patients are not willing to be tested.
+
+4- Officials deliberately (maybe for political reasons) underreported the numbers.
+
+In short, indexes which are based on COVID-caused mortality are not precise enough to use as metrics in order to determine a countries success or failure in response to COVID spread.
+
+# Discussion
+
+When enumerating different measures a government can adhere to, in order to reduce the baneful effects of a contagious disease, two of them are easy to quantify, **testing** and **vaccination**. Even though there are other easier and less expensive options such as: persuading to wear face masks, social distancing, lock-downs, or using mobile apps; measuring them is a hard task ([the COVID-19 Stringency Index](https://ourworldindata.org/metrics-explained-covid19-stringency-index) tries to fulfill that purpose). Nevertheless, there is a fair amount of data on test and vaccination rates in different countries.
+
+To make a more fair judgement, aside from worldwide comparison, we can exploit the similarity between Iran, Turkey, and Germany. Iran's population is almost equal to that of Turkey and Germany. In addition, Turkey is neighbor to Iran and the median age in 2020 for both countries was 32 (46 for Germany and 31 for the [world](https://www.cia.gov/the-world-factbook/countries/world/)).
+
+## Testing
+
+```{r}
+test_data <- read_csv("https://raw.github.com/owid/covid-19-data/master/public/data/testing/covid-testing-all-observations.csv") %>% 
+  filter(Date < as_date("2022-1-1"))
+
+names(test_data)[c(1, 2, 9, 13, 14)] <- c("country", "ISO_code", "Cumulative_total_per_thousand", "Short_term_positive_rate", "Short_term_tests_per_case")
+
+test_data$country <- str_replace(test_data$country, " - .*", "")
+
+ir_tur_ger_test_data <- test_data %>% filter(ISO_code %in% c("IRN", "TUR", "DEU"), !is.na(Short_term_positive_rate))
+
+ggplot() +
+  geom_area(data = ir_tur_ger_test_data %>% filter(ISO_code != "DEU"),
+            aes(Date, Short_term_positive_rate * 100, fill = country),
+            alpha = 0.75) +
+  geom_area(data = ir_tur_ger_test_data %>% filter(ISO_code == "DEU"), 
+           aes(Date, Short_term_positive_rate * 100, fill = country), 
+           alpha = 0.75) +
+  #scale_fill_viridis_d(alpha = 0.75) +
+  scale_fill_manual(values = c("Iran" = "turquoise4", "Turkey" = "gold2",
+                               "Germany" = "slateblue4") ) +
+  scale_x_date(date_breaks = "2 months", date_labels = "%b %y", limits = as.Date(c(NA, "2021-12-30"))) +
+  labs(y = "Positivity rate %", fill = "Country", 
+       title = "COVID-19 positivity rate through 2020 and 2021",
+       caption = "Source: Our World in Data") +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    axis.title.x = element_blank()
+  )
+```
+
+The positivity rate (positive cases divided by total tests) is a metric that shows the intensity of virus spread and at the same time, testing adequacy. The 5% threshold is [recommended](https://publichealth.jhu.edu/2020/covid-19-testing-understanding-the-percent-positive) by WHO as a maximum level of positivity rate which countries should remain at least two weeks below that level before reopening. [Some researchers](https://globalhealth.harvard.edu/evidence-roundup-why-positive-test-rates-need-to-fall-below-3/) even recommended 3% as a maximum level of positivity rate. Iran, unlike Germany or Turkey, **never satisfied the recommended threshold for positivity rate**.
+
+```{r}
+ggplot(ir_tur_ger_test_data, aes(Date, Cumulative_total_per_thousand , col = country, group = country)) +
+  geom_path(stat = "summary", size = 2) +
+  scale_color_manual(values = c("Germany" = "slateblue3", "Iran" = "steelblue3", "Turkey" = "gold2")) +
+  labs(y = "Tests per thousand people",
+       title = "Cumulative tests per thousand people through 2020 and 2021",
+       caption = "Source: Our World in Data") +
+  scale_y_continuous(label = scales::comma) +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    axis.title.x = element_blank()
+  )
+```
+
+
+Another evidence of Iran's testing inadequacy is the graph above which shows how its cumulative tests per 1000 people is smaller than Turkey and Germany after 2 years since the onset of the pandemic.
+
+ Since datasets for COVID testing are not updated uniformly by different countries, comparing Iran to other countries is a bit tricky. Thus, we need an interactive map to show tests data through time for different countries.
+ 
+```{r}
+test_plot <- test_data[c(1, 3, 9)] %>% filter(!is.na(Cumulative_total_per_thousand), Date >= "2021-1-1") %>%
+  mutate(Cumulative_total_per_thousand = round(Cumulative_total_per_thousand, 1),hover = paste0(Cumulative_total_per_thousand, "\n", Date))
+
+test_plot %>% group_by(country, month(Date)) %>% summarise(Date = min(Date)) %>%
+  left_join(test_plot) %>% 
+plotly::plot_ly( type="choropleth",
+                      locationmode = "country names",
+                      locations = ~ country,
+                      text = ~ hover,
+                      hoverinfo = "text+location",
+                      name = "",
+                      z = ~ log10(Cumulative_total_per_thousand),
+                      color = ~ log10(Cumulative_total_per_thousand),
+                      frame = ~ month(Date),
+                      colorbar = list(x = -0.1, ticklabelposition = "inside",
+                                      align = "right", 
+                                      tickfont = list(
+                                        size = 8
+                                      ),
+                        title = list(
+                          text = "Tests per\nthousand\npeople"
+                        ),
+                        tickmode = "array",
+                        tickvals = c(0, 1, 2, 3, 4), 
+                        ticktext = c(1, 10, 100, 1000, 10000)
+                      )) %>%
+  plotly::layout(title = "Worldwide cumulative COVID-19 tests in 2021"
+                 ) %>% 
+  plotly::config(displayModeBar = FALSE) %>% plotly::partial_bundle()
+```
+
+ 
+ 
+## Vaccination
+
+If testing is one of the first steps in fighting the pandemic when the knowledge of the disease is mostly dubious, vaccination is a kind of late solution when we are quite aware of the actual behavior of the virus. Iran's vaccination policy is a strange topic which requires a complete article to explain it. Anyway, let's benchmark Iran's vaccination.
+
+```{r}
+vac_data <- read_csv("https://raw.github.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv") %>% filter(date < as_date("2022-1-1"))
+
+names(vac_data)[1] <- "country"
+
+vac_data %>% 
+  filter(iso_code %in% c("OWID_WRL", "IRN", "TUR", "DEU") &
+         !is.na(total_vaccinations_per_hundred)) %>%
+  ggplot( aes(date, total_vaccinations_per_hundred , color = country)) +
+  geom_path(size = 2, stat = "summary") +
+scale_color_manual(values = c("Germany" = "slateblue3", 
+                              "Iran" = "steelblue3", 
+                              "Turkey" = "gold2", 
+                              "World" = "orange2")) + 
+labs(y = "Vaccination per hundred people", color = "Region",
+     title = "Cumulative COVID-19 vaccination per hundred people") +
+theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    axis.title.x = element_blank()
+  )
+```
+
+
+At the beginning, Iran lagged far behind Turkey, Germany, and even the rest of the world. Mainly due to mixture of conspiracy theories and profiteering, many Iranian hardliners, even the future health minister among them, [demanded](https://www.dw.com/en/irans-patriotic-vaccination-policy-is-making-some-people-rich/a-59342029) just home-grown vaccines being used. However, since August 2021, vaccination rate in Iran improved immensely. This initial slow vaccination can be a culprit responsible for the higher excess death rate in Iran compared to the early-vaccinated countries like Germany.
+
+# Final verdict
+
+
+The main benchmark in this report, was change in crude death rate of 2020-21 above the average for 2015-19. Regarding this metric, among the `r nrow(death_rate)` countries with available data, Iran is one of the worst hit. This becomes more hair-raising when we consider 20+ years of constant crude death rate before COVID-19 outbreak.
+
+As explained, number of confirmed COVID mortality is not a precise and informative metric to compare nations' performance based on that.
+
+In addition, testing and vaccination as two possible effective factors in Iran's failure was investigated in comparison to similar countries. Unlike in number of tests performed, in vaccination, Iran succeeded in filling the gaps and reached above the world rate at the end of 2021.
+
+In an attempt to analyze the root causes of Iran's failure in facing the crisis, we can name fragile economy, [political cover-ups, clinging to conspiracy theories](https://www.lowyinstitute.org/the-interpreter/denials-delays-and-conspiracy-theories-iran-s-covid-mismanagement), [profiteering](https://www.hrw.org/node/379700/printable/print), and many other items.
+
+A discerning reader may point to several oversimplifications made in this report. Comparing different countries without normalizing their [underlying differences](https://pubmed.ncbi.nlm.nih.gov/34449622/) e.g. median age, economical conditions and people with comorbidities, and using mean instead of regression to estimate a normal range of mortality for non-COVID years. Maybe, in the future, these topics will be studied in more detail.
+
+
+# Acknowledgement
+
+
+The interactive map drawn by `plotly` package in R is inspired by what presented in a [video](https://www.youtube.com/watch?v=RrtqBYLf404&ab_channel=Dataslice) in [Dataslice](https://www.youtube.com/channel/UCBV194XNr6CIQCCuw1v2rMQ) channel in youtube. Also two threads on Stack Overflow about  [plotly](https://stackoverflow.com/questions/59098544/how-to-turn-the-color-scale-in-plotly-r-to-log-scale) and [formattable](https://stackoverflow.com/questions/60498912/coloring-formattable-data-table-in-r-stock-data) were so helpful to what appeared in this notebook.
+
+
+# Sources
